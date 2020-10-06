@@ -159,7 +159,8 @@ class ACO:
                 old_src = src
                 src = path[-1]
                 backoff += 1
-                if backoff > len(path):
+                if backoff > len(path): # TODO join this part with the beginning
+                                        # to avoid duplications. 
                     tabu_list = list(self._vertices)
                     src = self._rd.choice(tabu_list)
                     tabu_list.remove(src)
