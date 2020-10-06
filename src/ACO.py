@@ -304,7 +304,7 @@ def main():
     print(parameters)
     graph = load(dataset)
     statistics = []
-    for i in range(2):
+    for i in range(15):
         print(f"replication: {i+1}/15")
         i = int(abs(math.sin(i) * 1000))
         aco = ACO(graph, output, ants, iterations, initial_pheromone,
