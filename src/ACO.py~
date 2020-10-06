@@ -1,0 +1,166 @@
+import pandas as pd
+import numpy as np
+from numpy.random import RandomState
+import argparse
+import math
+
+
+class ACO:
+
+    def __init__(self, graph, output, ants, iterations, decay_rate,
+                 alpha, beta, seed):
+        self._vertices = list(graph.keys())
+        self._n_vertices = len(graph)
+        self._n_edges = sum([edges["to"].size for vertice, edges \
+                                              in graph.items()])
+        self._graph = graph
+        self._output = output
+        self._ants = ants
+        self._iterations = iterations
+        self._decay_rate = decay_rate
+        self._alpha = alpha
+        self._beta = beta
+        self._rd = RandomState(seed)
+
+        self._pheromone = self._init_pheromone()
+        self._build_path()
+        
+    def run(self):
+        self._build_path()
+        
+    def _init_pheromone(self):
+        pheromone = dict()
+        for node, edges in self._graph.items():
+            to = edges["to"]
+            cost = edges["cost"]
+            pheromone[node] = self._rd.random_sample(to.shape)
+
+        return pheromone
+
+
+    def _build_path(self):
+        tabu_list = list(self._vertices)
+        src = 19#self._rd.choice(tabu_list)
+        tabu_list.remove(src)
+        path = [src]
+        path_cost = [0.0]
+        print(self._graph)
+        print(src)
+
+        backoff = 1
+        while len(tabu_list):
+            possibilities = self._graph[src]["to"]
+            cost = self._graph[src]["cost"]
+            probs = self._choice_destiny(src, tabu_list, possibilities, cost)
+
+            if np.any(np.isnan(probs)):
+                print("before")
+                print(tabu_list, path_cost, src, backoff)
+                tabu_list.extend(path[-backoff:])
+                path = path[:-backoff]
+                path_cost = path_cost[:-backoff]
+                src = path[-backoff]
+                backoff += 1
+                print(tabu_list, path_cost, src, backoff)
+
+                continue
+                
+                
+            src = self._rd.choice(possibilities, p=probs)
+            idx = np.where(possibilities == src)
+
+            path_cost.append(float(cost[idx]))
+            path.append(src)
+            tabu_list.remove(src)
+            print(src, idx)
+            print(tabu_list, path, len(path_cost))
+#            backoff = 1
+
+    def _visibility(self, d, b):
+        return d ** b
+
+    def _choice_destiny(self, src, tabu_list, possibilities, cost):
+        distances = list()
+        prob = np.zeros(possibilities.shape)
+        a, b = self._alpha, self._beta
+        i = 0
+        for p, d in zip(possibilities, cost):
+            if p in tabu_list:
+                local_pheromone = self._pheromone[src][i] ** a
+                prob[i] = local_pheromone * self._visibility(d, b)
+            i += 1
+
+        den = np.sum(prob)      
+        if den:
+            return prob/den
+        else:
+            return np.nan
+        
+    
+def load(filename):
+    df = pd.read_csv(filename, sep="\t", header=None)
+    groups = df.groupby(by=0)
+    graph = dict()
+    for key, group in groups:
+        to = group.iloc[:, 1].to_numpy()
+        cost = group.iloc[:, 2].to_numpy()
+        graph[key] = {"to": to, "cost": cost}
+
+    return graph
+
+def main():
+    aparse = argparse.ArgumentParser()
+    aparse.add_argument("dataset",
+                        nargs=1,
+                        type=str,
+                        help="Dataset with the graphs.")
+
+    aparse.add_argument("output",
+                        nargs=1,
+                        type=str,
+                        help="Save result")
+
+    aparse.add_argument("ants",
+                        nargs=1,
+                        type=int,
+                        help="Number of ants.")
+
+    aparse.add_argument("iterations",
+                        nargs=1,
+                        type=int,
+                        help="Number of iterations.")
+
+    aparse.add_argument("-d", "--decay-rate",
+                        nargs=1,
+                        type=float,
+                        help="Decay rate of pheromone")
+
+    aparse.add_argument("-a", "--alpha",
+                        nargs=1,
+                        type=float,
+                        default=[1.0],
+                        help="Paramenter alpha.")
+
+    aparse.add_argument("-b", "--beta",
+                        nargs=1,
+                        type=float,
+                        default=[5.0],
+                        help="Parameter beta.")
+
+
+    args = aparse.parse_args()
+    print(args)
+    dataset = args.dataset[0]
+    output = args.output[0]
+    ants = args.ants[0]
+    iterations = args.iterations[0]
+    decay_rate = args.decay_rate[0]
+    alpha = args.alpha[0]
+    beta = args.beta[0]
+
+    print(dataset, output, ants, iterations, decay_rate, alpha, beta)
+    graph = load(dataset)
+    ACO(graph, output, ants, iterations, decay_rate, alpha, beta, 0)
+    
+if __name__ == "__main__":
+    main()
