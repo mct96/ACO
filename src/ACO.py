@@ -304,7 +304,7 @@ def main():
     print(parameters)
     graph = load(dataset)
     statistics = []
-    for i in range(15):
+    for i in range(2):
         print(f"replication: {i+1}/15")
         i = int(abs(math.sin(i) * 1000))
         aco = ACO(graph, output, ants, iterations, initial_pheromone,
@@ -323,7 +323,8 @@ def main():
     
     df.to_csv(output, index=False, float_format="%.4f")
 
-    with open("".join(output.split(".")[:-1]), "wt", encoding="utf-8") as f:
+    parameters_file = "".join(output.rsplit(".", 1)[:-1]) + "-params.txt"
+    with open(parameters_file, "wt", encoding="utf-8") as f:
         f.write(parameters + "\n")
     
 
