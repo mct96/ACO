@@ -33,6 +33,7 @@ class ACO:
 
     def fit(self):
         for i in range(self._iterations):
+            print(f"iteration: {i+1}/{self._iterations}", end="\r")
             ants = self._explore()
             costs = np.array([ant[0] for ant in ants])
             max_cost = np.max(costs)
@@ -43,6 +44,7 @@ class ACO:
             self._statistics.append(np.array([max_cost, min_cost, mean_cost,
                                               std_cost, median_cost]))
 
+        print()
         return np.array(self._statistics)
         
     def _explore(self):
@@ -304,8 +306,8 @@ def main():
     print(parameters)
     graph = load(dataset)
     statistics = []
-    for i in range(15):
-        print(f"replication: {i+1}/15")
+    for i in range(5):
+        print(f"replication: {i+1}/5")
         i = int(abs(math.sin(i) * 1000))
         aco = ACO(graph, output, ants, iterations, initial_pheromone,
                   decay_rate, alpha, beta, reinforcement_gain, eletism,

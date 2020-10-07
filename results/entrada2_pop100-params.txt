@@ -1,6 +1,6 @@
-dataset: ../dataset/entrada1.txt
-output: ../results/entrada1_pop20.csv
-ants: 20
+dataset: ../dataset/entrada2.txt
+output: ../results/entrada2_pop100.csv
+ants: 100
 iterations: 200
 initial pheromone: 0.6
 decay rate: 0.5
