@@ -8,7 +8,7 @@ from copy import deepcopy
 class ACO:
 
     def __init__(self, graph, output, ants, iterations, initial_pheromone,
-                 decay_rate, alpha, beta, Q, eletism, eletism_gain, seed):
+                 decay_rate, alpha, beta, xi, Q, eletism, eletism_gain, seed):
         self._vertices = list(graph.keys())
         self._n_vertices = len(graph)
         self._n_edges = sum([edges["to"].size for vertice, edges \
@@ -21,7 +21,8 @@ class ACO:
         self._decay_rate = decay_rate
         self._alpha = alpha
         self._beta = beta
-        self._Q = 1
+        self._xi = xi
+        self._Q = Q
         self._EG = eletism_gain
         self._eletism = eletism
 
@@ -30,6 +31,7 @@ class ACO:
 
         self._best_ant = None
         self._statistics = []
+
 
     def fit(self):
         for i in range(self._iterations):
@@ -46,19 +48,20 @@ class ACO:
 
         print()
         return np.array(self._statistics)
-        
+
+
     def _explore(self):
         ants = self._build_ants()
 
         best_local_ant = ants[0]
         if self._best_ant == None or best_local_ant[0] > self._best_ant[0]:
             self._best_ant = best_local_ant
-        
+
         delta = self._release_pheromone(ants)
         decreased_pheromone = self._decrease_pheromone()
         if self._eletism:
             eletist_ant = self._release_eletist()
-            
+
         for _from, pheromone in self._pheromone.items():
             if self._eletism:
                 self._pheromone[_from] = decreased_pheromone[_from] +\
@@ -66,8 +69,10 @@ class ACO:
             else:
                 self._pheromone[_from] = decreased_pheromone[_from] +\
                     delta[_from]
+
         return ants
-        
+
+
     def _init_pheromone(self, zero):
         pheromone = dict()
         for node, edges in self._graph.items():
@@ -102,6 +107,7 @@ class ACO:
 
         return d_ph
 
+
     def _release_eletist(self):
         d_ph = self._init_pheromone(zero=True)
 
@@ -121,6 +127,7 @@ class ACO:
         d_ph
         return d_ph
 
+
     def _decrease_pheromone(self):
         d_ph = deepcopy(self._pheromone)
         p = self._decay_rate
@@ -134,44 +141,65 @@ class ACO:
     def _build_ants(self):
         ranking = []
         for i in range(self._ants):
+            print(f"ant {i+1}/{self._ants}", end="\r")
             path, path_cost, total_cost, n = self._build_path()
             ranking.append((total_cost, path))# , path_cost, n))
 
+        print()
         ranking.sort(reverse=True)
         return ranking
 
 
-    def _build_path(self):
+    def _init_path(self):
         tabu_list = list(self._vertices)
         src = self._rd.choice(tabu_list)
         tabu_list.remove(src)
         path = [src]
         path_cost = [0.0]
+        return tabu_list, path, path_cost, src
 
-        backoff = 1
+    def _backoff_again(self, backoff):
+        v = self._rd.random_sample() # a number in [0, 1)
+        xi = self._xi
+        return v < math.exp(-abs(xi*(backoff - 1)))
+
+
+    def _best_of_folder(self, folder):
+        folder.sort(reverse=True) # folder is a list with cost and path as
+                                  # members.
+        return folder[0]
+
+
+    def _store_in_folder(self, folder, path, path_cost):
+        path = deepcopy(path)
+        path_cost = deepcopy(path_cost)
+        total_cost = np.sum(path_cost)
+        size = len(list(set(path)))
+        folder.append([path, path_cost, total_cost, size])
+
+
+    def _build_path(self):
+        tabu_list, path, path_cost, src = self._init_path()
+
+        backoff, folder = 1, []
         while len(tabu_list):
             possibilities = self._graph[src]["to"]
             cost = self._graph[src]["cost"]
             probs = self._choice_destiny(src, tabu_list, possibilities, cost)
 
             if np.any(np.isnan(probs)):
+                self._store_in_folder(folder, path, path_cost)
+
+                if not self._backoff_again(backoff) or backoff >= len(path):
+                    return self._best_of_folder(folder)
+
                 tabu_list.extend(path[-backoff:])
                 path = path[:-backoff]
                 path_cost = path_cost[:-backoff]
-                old_src = src
                 src = path[-1]
                 backoff += 1
-                if backoff > len(path): # TODO join this part with the beginning
-                                        # to avoid duplications. 
-                    tabu_list = list(self._vertices)
-                    src = self._rd.choice(tabu_list)
-                    tabu_list.remove(src)
-                    path = [src]
-                    path_cost = [0.0]
-                    backoff = 1
                 continue
 
-            old_src = src
             src = self._rd.choice(possibilities, p=probs)
             idx = np.where(possibilities == src)
 
@@ -185,6 +213,7 @@ class ACO:
 
     def _visibility(self, d, b):
         return d ** b
+
 
     def _choice_destiny(self, src, tabu_list, possibilities, cost):
         distances = list()
@@ -242,7 +271,7 @@ def main():
                         type=float,
                         default=[0.5],
                         help="Initial value for pheromone. Should be greater than 0.")
-    
+
     aparse.add_argument("-d", "--decay-rate",
                         nargs=1,
                         type=float,
@@ -260,12 +289,18 @@ def main():
                         default=[5.0],
                         help="Parameter beta.")
 
+    aparse.add_argument("--xi",
+                        nargs=1,
+                        type=float,
+                        default=[1.0],
+                        help="Backoff decay rate.")
+
     aparse.add_argument("-G", "--reinforcement-gain",
                         nargs=1,
                         type=float,
                         default=[100],
                         help="Pheromone release reinforcement gain.")
-    
+
     aparse.add_argument("-e", "--eletism",
                         action="store_const",
                         const=True,
@@ -287,10 +322,11 @@ def main():
     decay_rate = args.decay_rate[0]
     alpha = args.alpha[0]
     beta = args.beta[0]
+    xi = args.xi[0] # control stochastic backoff
     reinforcement_gain = args.reinforcement_gain[0]
     eletism = args.eletism
     eletism_gain = args.eletism_gain[0]
-    
+
     parameters = f"dataset: {dataset}\n"\
                  f"output: {output}\n"\
                  f"ants: {ants}\n"\
@@ -299,6 +335,7 @@ def main():
                  f"decay rate: {decay_rate}\n"\
                  f"alpha: {alpha}\n"\
                  f"beta: {beta}\n"\
+                 f"xi: {xi}\n"\
                  f"reinforcement gain: {reinforcement_gain}\n"\
                  f"eletism: {eletism}\n"\
                  f"eletism gain: {eletism_gain}"
@@ -310,25 +347,25 @@ def main():
         print(f"replication: {i+1}/5")
         i = int(abs(math.sin(i) * 1000))
         aco = ACO(graph, output, ants, iterations, initial_pheromone,
-                  decay_rate, alpha, beta, reinforcement_gain, eletism,
+                  decay_rate, alpha, beta, xi, reinforcement_gain, eletism,
                   eletism_gain, i)
 
         pop = aco.fit()
 
         statistics.append(pop)
-        
+
     statistics = np.mean(statistics, axis=0)
 
     df = pd.DataFrame(data=statistics,
                       columns=["max", "min", "mean", "std", "median"],
                       dtype=np.float)
-    
+
     df.to_csv(output, index=False, float_format="%.4f")
 
     parameters_file = "".join(output.rsplit(".", 1)[:-1]) + "-params.txt"
     with open(parameters_file, "wt", encoding="utf-8") as f:
         f.write(parameters + "\n")
-    
+
 
 if __name__ == "__main__":
     main()
