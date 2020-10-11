@@ -37,6 +37,7 @@ class ACO:
         for i in range(self._iterations):
             print(f"iteration: {i+1}/{self._iterations}{' '*20}", end="\r")
             ants = self._explore()
+            print(f"best: {self._best_ant}")
             costs = np.array([ant[0] for ant in ants])
             max_cost = np.max(costs)
             min_cost = np.min(costs)
