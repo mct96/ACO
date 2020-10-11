@@ -35,7 +35,7 @@ class ACO:
 
     def fit(self):
         for i in range(self._iterations):
-            print(f"iteration: {i+1}/{self._iterations}", end="\r")
+            print(f"iteration: {i+1}/{self._iterations}{' '*20}", end="\r")
             ants = self._explore()
             costs = np.array([ant[0] for ant in ants])
             max_cost = np.max(costs)
@@ -141,7 +141,7 @@ class ACO:
     def _build_ants(self):
         ranking = []
         for i in range(self._ants):
-            print(f"ant {i+1}/{self._ants}", end="\r")
+            print(f"ant {i+1}/{self._ants}{' '*20}", end="\r")
             path, path_cost, total_cost, n = self._build_path()
             ranking.append((total_cost, path))# , path_cost, n))
 
