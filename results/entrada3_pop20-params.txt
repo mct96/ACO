@@ -1,0 +1,12 @@
+dataset: ../dataset/entrada3.txt
+output: ../results/entrada3_pop20.csv
+ants: 20
+iterations: 80
+initial pheromone: 0.6
+decay rate: 0.5
+alpha: 1.0
+beta: 5.0
+xi: 0.3
+reinforcement gain: 5.0
+eletism: True
+eletism gain: 5.0
