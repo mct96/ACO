@@ -184,11 +184,13 @@ class ACO:
 
         backoff, folder = 1, []
         while len(tabu_list):
+            print(path)
             possibilities = self._graph[src]["to"]
             cost = self._graph[src]["cost"]
             probs = self._choice_destiny(src, tabu_list, possibilities, cost)
-
-            if np.any(np.isnan(probs)):
+            print("out")
+            if np.all(np.isnan(probs)):
+                print(probs)
                 self._store_in_folder(folder, path, path_cost)
 
                 if not self._backoff_again(backoff) or backoff >= len(path):
