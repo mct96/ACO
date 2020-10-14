@@ -4,9 +4,9 @@ from numpy.random import RandomState
 import argparse
 import math
 from copy import deepcopy
+from datetime import datetime
 
 class ACO:
-
     def __init__(self, graph, output, ants, iterations, initial_pheromone,
                  decay_rate, alpha, beta, xi, Q, eletism, eletism_gain, seed):
         self._vertices = list(graph.keys())
@@ -35,9 +35,8 @@ class ACO:
 
     def fit(self):
         for i in range(self._iterations):
-            print(f"iteration: {i+1}/{self._iterations}{' '*20}", end="\r")
+            print(f"iteration: {i+1}/{self._iterations}{' '*20}")
             ants = self._explore()
-            print(f"best: {self._best_ant}")
             costs = np.array([ant[0] for ant in ants])
             max_cost = np.max(costs)
             min_cost = np.min(costs)
@@ -184,13 +183,11 @@ class ACO:
 
         backoff, folder = 1, []
         while len(tabu_list):
-            print(path)
             possibilities = self._graph[src]["to"]
             cost = self._graph[src]["cost"]
             probs = self._choice_destiny(src, tabu_list, possibilities, cost)
-            print("out")
-            if np.all(np.isnan(probs)):
-                print(probs)
+
+            if np.any(np.isnan(probs)):
                 self._store_in_folder(folder, path, path_cost)
 
                 if not self._backoff_again(backoff) or backoff >= len(path):
@@ -223,9 +220,10 @@ class ACO:
         prob = np.zeros(possibilities.shape)
         a, b = self._alpha, self._beta
         i = 0
+        pheromones = np.array(self._pheromone[src]) ** a
         for p, d in zip(possibilities, cost):
             if p in tabu_list:
-                local_pheromone = self._pheromone[src][i] ** a
+                local_pheromone = pheromones[i]
                 prob[i] = local_pheromone * self._visibility(d, b)
             i += 1
 
@@ -298,7 +296,7 @@ def main():
                         default=[1.0],
                         help="Backoff decay rate.")
 
-    aparse.add_argument("-G", "--reinforcement-gain",
+    aparse.add_argument("-Q", "--reinforcement-gain",
                         nargs=1,
                         type=float,
                         default=[100],
