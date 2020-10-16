@@ -124,7 +124,6 @@ class ACO:
         for _from, pheromone in d_ph.items():
             d_ph[_from] /= max_value
 
-        d_ph
         return d_ph
 
 
@@ -137,9 +136,21 @@ class ACO:
 
         return d_ph
 
+    def _probabilities(self):
+        a, b = self._alpha, self._beta
+        probs = dict()
+        for from_, pheromone in self._pheromone:
+            T = pheromone ** a # Pheromone of all edges
+            D = self._graph[from_][1] ** b # Length of all edges
+            probs = T * D # TODO test if it is correct
 
+        return probs
+
+    
     def _build_ants(self):
         ranking = []
+        probs = self._probabilites()
+        
         for i in range(self._ants):
             print(f"ant {i+1}/{self._ants}{' '*20}", end="\r")
             path, path_cost, total_cost, n = self._build_path()
@@ -158,6 +169,7 @@ class ACO:
         path_cost = [0.0]
         return tabu_list, path, path_cost, src
 
+    
     def _backoff_again(self, backoff):
         v = self._rd.random_sample() # a number in [0, 1)
         xi = self._xi
@@ -178,16 +190,16 @@ class ACO:
         folder.append([path, path_cost, total_cost, size])
 
 
-    def _build_path(self):
+    def _build_path(self, probs):
         tabu_list, path, path_cost, src = self._init_path()
 
         backoff, folder = 1, []
         while len(tabu_list):
             possibilities = self._graph[src]["to"]
             cost = self._graph[src]["cost"]
-            probs = self._choice_destiny(src, tabu_list, possibilities, cost)
+            dst_probs = self._next_move(src, probs, tabu_list)
 
-            if np.any(np.isnan(probs)):
+            if np.any(np.isnan(dst_probs)):
                 self._store_in_folder(folder, path, path_cost)
 
                 if not self._backoff_again(backoff) or backoff >= len(path):
@@ -200,40 +212,22 @@ class ACO:
                 backoff += 1
                 continue
 
-            src = self._rd.choice(possibilities, p=probs)
-            idx = np.where(possibilities == src)
+            dst = self._rd.choice(possibilities, p=dst_probs)
+            idx = np.where(possibilities == dst)
 
             path_cost.append(float(cost[idx]))
-            path.append(src)
-            tabu_list.remove(src)
+            path.append(dst)
+            tabu_list.remove(dst)
+            src = dst
 
         total_cost = sum(path_cost)
         return path, path_cost, total_cost, len(list(set(path)))
 
+    
+    def _choice_destiny(self, src, probs, tabu_list):
+        pass
 
-    def _visibility(self, d, b):
-        return d ** b
-
-
-    def _choice_destiny(self, src, tabu_list, possibilities, cost):
-        distances = list()
-        prob = np.zeros(possibilities.shape)
-        a, b = self._alpha, self._beta
-        i = 0
-        pheromones = np.array(self._pheromone[src]) ** a
-        for p, d in zip(possibilities, cost):
-            if p in tabu_list:
-                local_pheromone = pheromones[i]
-                prob[i] = local_pheromone * self._visibility(d, b)
-            i += 1
-
-        den = np.sum(prob)
-        if den:
-            return prob/den
-        else:
-            return np.nan
-
-
+    
 def load(filename):
     df = pd.read_csv(filename, sep="\t", header=None)
     groups = df.groupby(by=0)
