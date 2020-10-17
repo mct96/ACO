@@ -1,0 +1,23 @@
+                                   PARAMETERS                                   
+
+dataset: ../dataset/entrada2.txt
+output: entrada2_pop40.csv
+ants: 40
+iterations: 80
+initial pheromone: 0.5
+decay rate: 0.5
+alpha: 1.0
+beta: 5.0
+xi: 0.3 (no effect yet)
+reinforcement gain: 1.0
+eletism: True
+eletism gain: 30.0
+--------------------------------------------------------------------------------
+                                  PERFORMANCE                                   
+
+
+seed 1, replication took: 0:00:28.984819
+seed 43, replication took: 0:00:33.169923
+seed 85, replication took: 0:00:26.692067
+seed 127, replication took: 0:00:26.152051
+seed 169, replication took: 0:00:28.058776

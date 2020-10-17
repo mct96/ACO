@@ -5,13 +5,17 @@ import argparse
 import math
 from copy import deepcopy
 from datetime import datetime
+from scipy.stats import sem, t
+from datetime import datetime
+
+np.set_printoptions(precision=3, threshold=2000, suppress=True, linewidth=200)
+
 
 
 class ACO:
-    def __init__(self, graph, output, ants, iterations, initial_pheromone,
-                 decay_rate, alpha, beta, xi, Q, elitism, elitism_gain, seed):
+    def __init__(self, graph, ants, iterations, initial_pheromone, decay_rate,
+                 alpha, beta, xi, Q, elitism, elitism_gain, seed):
         self._graph = graph
-        self._output = output
         self._ants = ants
         self._iterations = iterations
         self._initial_pheromone = initial_pheromone
@@ -24,24 +28,50 @@ class ACO:
         self._eg = elitism_gain
 
         self._rd = RandomState(seed)
-        self._pheromone = np.full(graph.shape, self._initial_pheromone)
+        self._pheromone = None
 
         self._best_ant = None
-        self._statistics = []
+        self._statistics = None
 
-        for i in range(80):
-            ants, max_cost = self._build_colony(40)
+        
+    def _save_statistics(self, costs):
+        max_v = np.max(costs)
+        min_v = np.min(costs)
+        mean = np.mean(costs)
+        std = np.std(costs)
+        median = np.median(costs)
+
+        statistics = [mean, std, max_v, min_v, median]
+        self._statistics.append(statistics)
+
+
+    def set_seed(self, seed):
+        self._rd = RandomState(seed)
+
+        
+    def _reset_state(self):
+        self._pheromone = np.full(self._graph.shape, self._initial_pheromone)
+        self._statistics = list()
+
+        
+    def fit(self):
+        self._reset_state()
+        
+        for i in range(self._iterations):
+            ants, max_cost = self._build_colony(self._ants)
+            costs = np.array([ant[1] for ant in ants])
+            self._save_statistics(costs)
             
             local_best_ant, best_ant = ants[0], self._best_ant
             if not best_ant or local_best_ant[1] > best_ant[1]:
                 self._best_ant = ants[0]
 
             self._update(ants, normalize_by=max_cost)
+        return self._best_ant
             
-
             
     def _build_colony(self, n):
-        ants = []
+        ants = list()
         props = self._props()
 
         biggest_cost = 0
@@ -58,11 +88,12 @@ class ACO:
 
     def _build_path(self, probs):
         tabu_list = self._make_list(1)
-        cost = self._make_list(-1)
+        cost = self._make_list(0)
         path = self._make_list(-1)
 
-        pos, i = self._goto(shape=tabu_list.shape), 0
-        while np.sum(tabu_list) >= 0:
+        pos, i = self._goto(shape=tabu_list.shape), 1
+        path[0] = pos
+        while np.sum(tabu_list) > 0:
             tabu_list[pos] = 0.0
             local_probs = tabu_list * probs[pos]
             den = np.sum(local_probs)
@@ -72,19 +103,17 @@ class ACO:
             local_probs /= den
             goto = self._goto(probs=local_probs)
 
-            cost[pos] = self._graph[pos][goto]
-            path[i] = pos
+            cost[i] = self._graph[pos][goto]
+            path[i] = goto
             pos, i = goto, i+1
 
         path = path[np.where(path != -1)]
-        cost = cost[np.where(cost != -1)]
-        print(path.shape)
-        return path, np.sum(cost)
+        return path, cost
 
 
     def _props(self):
         a, b = self._alpha, self._beta
-        probs = self._pheromone ** a * self._graph ** b
+        probs = (self._pheromone ** a) * (self._graph ** b)
         return probs
 
 
@@ -96,7 +125,8 @@ class ACO:
 
     def _goto(self, *, probs=None, shape=None):
         if np.any(probs) != None:
-            return self._rd.choice(np.arange(probs.shape[0]), p=probs)
+            pos =  self._rd.choice(np.arange(probs.shape[0]), p=probs)
+            return pos
         elif np.any(shape) != None:
             return self._rd.choice(np.arange(shape[0]))
 
@@ -107,9 +137,10 @@ class ACO:
         for route, L in ants:
             self._update_ph(route, L/normalize_by)
 
-        elitist_route = self._best_ant[0]
-        elitist_cost = self._eg * self._best_ant[1]
-        self._update_ph(elitist_route, elitist_cost/normalize_by)
+        if self._elitism:
+            elitist_route = self._best_ant[0]
+            elitist_cost = self._eg * self._best_ant[1]
+            self._update_ph(elitist_route, elitist_cost/normalize_by)
         
         
     def _decrease_ph(self):
@@ -120,11 +151,11 @@ class ACO:
     def _update_ph(self, path, L):
         from_, to_ = path[:-1], path[1:]
         q = self._q
-        route = np.column_stack((from_, to_))
-        self._pheromone[route] += q * L
+        self._pheromone[from_, to_] += q * L
 
 
 
+        
 def load(filename):
     df = pd.read_csv(filename, sep="\t", header=None)
     nodes = np.unique((df.iloc[:, 0], df.iloc[:, 1]))
@@ -136,6 +167,8 @@ def load(filename):
     distances[from_, to_] = dists
 
     return distances
+
+
 
 
 def main():
@@ -207,6 +240,7 @@ def main():
                         default=[5.0],
                         help="Gain of eletist ants")
 
+    
     args = aparse.parse_args()
     dataset = args.dataset[0]
     output = args.output[0]
@@ -221,26 +255,80 @@ def main():
     eletism = args.eletism
     eletism_gain = args.eletism_gain[0]
 
-    parameters = f"dataset: {dataset}\n"\
-                 f"output: {output}\n"\
-                 f"ants: {ants}\n"\
-                 f"iterations: {iterations}\n"\
-                 f"initial pheromone: {initial_pheromone}\n"\
-                 f"decay rate: {decay_rate}\n"\
-                 f"alpha: {alpha}\n"\
-                 f"beta: {beta}\n"\
-                 f"xi: {xi}\n"\
-                 f"reinforcement gain: {reinforcement_gain}\n"\
-                 f"eletism: {eletism}\n"\
-                 f"eletism gain: {eletism_gain}"
+    parameters = "PARAMETERS".center(80, " ") + "\n\n"
+    parameters += f"dataset: {dataset}\n"\
+                  f"output: {output}\n"\
+                  f"ants: {ants}\n"\
+                  f"iterations: {iterations}\n"\
+                  f"initial pheromone: {initial_pheromone}\n"\
+                  f"decay rate: {decay_rate}\n"\
+                  f"alpha: {alpha}\n"\
+                  f"beta: {beta}\n"\
+                  f"xi: {xi} (no effect yet)\n"\
+                  f"reinforcement gain: {reinforcement_gain}\n"\
+                  f"eletism: {eletism}\n"\
+                  f"eletism gain: {eletism_gain}"
 
     print(parameters)
+    print("-" * 80)
+    parameters += "\n" + "-" * 80 + "\n"
+    parameters += "PERFORMANCE".center(80, " ") + "\n\n"
     graph = load(dataset)
 
-    aco = ACO(graph, output, ants, iterations, initial_pheromone,
+    aco = ACO(graph, ants, iterations, initial_pheromone,
               decay_rate, alpha, beta, xi, reinforcement_gain, eletism,
-              eletism_gain, 0)
+              eletism_gain, seed=0)
 
+    statistics = list()
+    for i in range(5):
+        print(f"replication {i} started. {' ' * 15}", end="\r")
+        seed = abs(int(13 * i + 11 * i + 7 * i + 5 * i + 3 * i + 2 * i + i + 1))
+        aco.set_seed(seed=seed)
+        start = datetime.now()
+        solution = aco.fit()
+        end = datetime.now()
+        statistics.append(aco._statistics)
+        parameters += f"\nseed {seed}, replication took: {end-start}"
+    print("✔ - replications completed. ")
+        
+    result = statistical_report(np.array(statistics))
+    save_results(output, result)
+    save_parameters(output, parameters)
+
+
+    
+
+
+def statistical_report(replications, confidence=0.95):
+    statistics = np.mean(replications, axis=0)
+    rows = statistics.shape[0]
+    stderr = sem(replications, axis=0)
+    n = rows
+    h = stderr * t.ppf((1+confidence)/2, n - 1)
+    statistics = np.append(statistics, h, axis=1)
+
+    return statistics
+
+
+
+def save_results(output, result):
+    print("saving results...", end="\r")
+    df = pd.DataFrame(data=result,
+                      columns=["mean", "std", "max", "min", "median",
+                               "stderr (mean)", "stderr (std)", "stderr (max)",
+                               "stderr (mean)", "stderr (median)"])
+    
+    df.to_csv(output, float_format="%.4f", index=False)
+    print("✔ - results saved! :D")
+
+
+def save_parameters(output, parameters):
+    print("saving parameters...", end="\r")
+    base_name = "".join(output.rsplit(".")[:-1])
+    base_name = f"{base_name}_params.txt"
+    with open(base_name, "wt", encoding="utf-8") as f:
+        f.write(parameters + "\n")
+    print("✔ - parameters saved! xD")
 
 if __name__ == "__main__":
     main()
