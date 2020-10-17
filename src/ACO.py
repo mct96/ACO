@@ -41,7 +41,7 @@ class ACO:
         std = np.std(costs)
         median = np.median(costs)
 
-        statistics = [mean, std, max_v, min_v, median]
+        statistics = [max_v, min_v, mean, std, median]
         self._statistics.append(statistics)
 
 
@@ -228,17 +228,17 @@ def main():
                         default=[100],
                         help="Pheromone release reinforcement gain.")
 
-    aparse.add_argument("-e", "--eletism",
+    aparse.add_argument("-e", "--elitism",
                         action="store_const",
                         const=True,
                         default=False,
-                        help="Eletism.")
+                        help="Enable elitism.")
 
-    aparse.add_argument("-g", "--eletism-gain",
+    aparse.add_argument("-g", "--elitism-gain",
                         nargs=1,
                         type=float,
                         default=[5.0],
-                        help="Gain of eletist ants")
+                        help="Gain of elitist ants")
 
     
     args = aparse.parse_args()
@@ -252,8 +252,8 @@ def main():
     beta = args.beta[0]
     xi = args.xi[0] # control stochastic backoff
     reinforcement_gain = args.reinforcement_gain[0]
-    eletism = args.eletism
-    eletism_gain = args.eletism_gain[0]
+    elitism = args.elitism
+    elitism_gain = args.elitism_gain[0]
 
     parameters = "PARAMETERS".center(80, " ") + "\n\n"
     parameters += f"dataset: {dataset}\n"\
@@ -266,8 +266,8 @@ def main():
                   f"beta: {beta}\n"\
                   f"xi: {xi} (no effect yet)\n"\
                   f"reinforcement gain: {reinforcement_gain}\n"\
-                  f"eletism: {eletism}\n"\
-                  f"eletism gain: {eletism_gain}"
+                  f"elitism: {elitism}\n"\
+                  f"elitism gain: {elitism_gain}"
 
     print(parameters)
     print("-" * 80)
@@ -276,8 +276,8 @@ def main():
     graph = load(dataset)
 
     aco = ACO(graph, ants, iterations, initial_pheromone,
-              decay_rate, alpha, beta, xi, reinforcement_gain, eletism,
-              eletism_gain, seed=0)
+              decay_rate, alpha, beta, xi, reinforcement_gain, elitism,
+              elitism_gain, seed=0)
 
     statistics = list()
     for i in range(5):
