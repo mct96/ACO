@@ -4,17 +4,18 @@ from numpy.random import RandomState
 import argparse
 import math
 from copy import deepcopy
+from datetime import datetime
+from scipy.stats import sem, t
+from datetime import datetime
+
+np.set_printoptions(precision=3, threshold=2000, suppress=True, linewidth=200)
+
+
 
 class ACO:
-
-    def __init__(self, graph, output, ants, iterations, initial_pheromone,
-                 decay_rate, alpha, beta, xi, Q, eletism, eletism_gain, seed):
-        self._vertices = list(graph.keys())
-        self._n_vertices = len(graph)
-        self._n_edges = sum([edges["to"].size for vertice, edges \
-                                              in graph.items()])
+    def __init__(self, graph, ants, iterations, initial_pheromone, decay_rate,
+                 alpha, beta, xi, Q, elitism, elitism_gain, seed):
         self._graph = graph
-        self._output = output
         self._ants = ants
         self._iterations = iterations
         self._initial_pheromone = initial_pheromone
@@ -22,230 +23,153 @@ class ACO:
         self._alpha = alpha
         self._beta = beta
         self._xi = xi
-        self._Q = Q
-        self._EG = eletism_gain
-        self._eletism = eletism
+        self._q = Q
+        self._elitism = elitism
+        self._eg = elitism_gain
 
         self._rd = RandomState(seed)
-        self._pheromone = self._init_pheromone(zero=False)
+        self._pheromone = None
 
         self._best_ant = None
-        self._statistics = []
+        self._statistics = None
+
+        
+    def _save_statistics(self, costs):
+        max_v = np.max(costs)
+        min_v = np.min(costs)
+        mean = np.mean(costs)
+        std = np.std(costs)
+        median = np.median(costs)
+
+        statistics = [mean, std, max_v, min_v, median]
+        self._statistics.append(statistics)
 
 
+    def set_seed(self, seed):
+        self._rd = RandomState(seed)
+
+        
+    def _reset_state(self):
+        self._pheromone = np.full(self._graph.shape, self._initial_pheromone)
+        self._statistics = list()
+
+        
     def fit(self):
+        self._reset_state()
+        
         for i in range(self._iterations):
-            print(f"iteration: {i+1}/{self._iterations}{' '*20}", end="\r")
-            ants = self._explore()
-            print(f"best: {self._best_ant}")
-            costs = np.array([ant[0] for ant in ants])
-            max_cost = np.max(costs)
-            min_cost = np.min(costs)
-            mean_cost = np.mean(costs)
-            std_cost = np.std(costs)
-            median_cost = np.median(costs)
-            self._statistics.append(np.array([max_cost, min_cost, mean_cost,
-                                              std_cost, median_cost]))
+            ants, max_cost = self._build_colony(self._ants)
+            costs = np.array([ant[1] for ant in ants])
+            self._save_statistics(costs)
+            
+            local_best_ant, best_ant = ants[0], self._best_ant
+            if not best_ant or local_best_ant[1] > best_ant[1]:
+                self._best_ant = ants[0]
 
-        print()
-        return np.array(self._statistics)
+            self._update(ants, normalize_by=max_cost)
+        return self._best_ant
+            
+            
+    def _build_colony(self, n):
+        ants = list()
+        props = self._props()
 
+        biggest_cost = 0
+        for i in range(n):
+            path, cost = self._build_path(props)
+            total_cost = np.sum(cost)
+            biggest_cost = np.max((total_cost, biggest_cost))
+            ant = [path, total_cost]
+            ants.append(ant)
 
-    def _explore(self):
-        ants = self._build_ants()
+        ants.sort(key=lambda ant: ant[1], reverse=True)
+        return ants, biggest_cost
+            
 
-        best_local_ant = ants[0]
-        if self._best_ant == None or best_local_ant[0] > self._best_ant[0]:
-            self._best_ant = best_local_ant
+    def _build_path(self, probs):
+        tabu_list = self._make_list(1)
+        cost = self._make_list(0)
+        path = self._make_list(-1)
 
-        delta = self._release_pheromone(ants)
-        decreased_pheromone = self._decrease_pheromone()
-        if self._eletism:
-            eletist_ant = self._release_eletist()
+        pos, i = self._goto(shape=tabu_list.shape), 1
+        path[0] = pos
+        while np.sum(tabu_list) > 0:
+            tabu_list[pos] = 0.0
+            local_probs = tabu_list * probs[pos]
+            den = np.sum(local_probs)
+            if den == 0:
+                break
+            
+            local_probs /= den
+            goto = self._goto(probs=local_probs)
 
-        for _from, pheromone in self._pheromone.items():
-            if self._eletism:
-                self._pheromone[_from] = decreased_pheromone[_from] +\
-                    delta[_from] + self._EG * eletist_ant[_from]
-            else:
-                self._pheromone[_from] = decreased_pheromone[_from] +\
-                    delta[_from]
+            cost[i] = self._graph[pos][goto]
+            path[i] = goto
+            pos, i = goto, i+1
 
-        return ants
-
-
-    def _init_pheromone(self, zero):
-        pheromone = dict()
-        for node, edges in self._graph.items():
-            to = edges["to"]
-            cost = edges["cost"]
-
-            if zero:
-                pheromone[node] = np.zeros_like(to, dtype=np.float)
-            else:
-                pheromone[node] = np.full(to.shape, self._initial_pheromone,
-                                          dtype=np.float)
-
-        return pheromone
-
-
-    def _release_pheromone(self, ants):
-        d_ph = self._init_pheromone(zero=True) # initialize with zeros.
-
-        max_value = np.array(0)
-        for ant in ants:
-            total_cost, path = ant
-            delta = self._Q * total_cost # released pheromone by ant "ant".
-            for _from, _to in zip(path[:-1], path[1:]): # for each edge.
-                to = self._graph[_from]["to"] # all neighbors of _from.
-                idx_dst = np.where(to == _to) # index in pheromone vector.
-                d_ph[_from][idx_dst] += delta
-
-                max_value = np.max([max_value, np.max(d_ph[_from])])
-
-        for _from, pheromone in d_ph.items():
-            d_ph[_from] /= max_value
-
-        return d_ph
+        path = path[np.where(path != -1)]
+        return path, cost
 
 
-    def _release_eletist(self):
-        d_ph = self._init_pheromone(zero=True)
-
-        path = self._best_ant[1]
-        max_value = np.array(0)
-        delta = self._Q * self._best_ant[0]
-        for _from, _to in zip(path[:-1], path[1:]):
-            to = self._graph[_from]["to"] # all neighbors of _from.
-            idx_dst = np.where(to == _to) # index in pheromone vector.
-            d_ph[_from][idx_dst] += delta
-
-            max_value = np.max([max_value, np.max(d_ph[_from])])
-
-        for _from, pheromone in d_ph.items():
-            d_ph[_from] /= max_value
-
-        d_ph
-        return d_ph
-
-
-    def _decrease_pheromone(self):
-        d_ph = deepcopy(self._pheromone)
-        p = self._decay_rate
-
-        for _from, pheromone in d_ph.items():
-            d_ph[_from] = (1-p) * pheromone
-
-        return d_ph
-
-
-    def _build_ants(self):
-        ranking = []
-        for i in range(self._ants):
-            print(f"ant {i+1}/{self._ants}{' '*20}", end="\r")
-            path, path_cost, total_cost, n = self._build_path()
-            ranking.append((total_cost, path))# , path_cost, n))
-
-        print()
-        ranking.sort(reverse=True)
-        return ranking
-
-
-    def _init_path(self):
-        tabu_list = list(self._vertices)
-        src = self._rd.choice(tabu_list)
-        tabu_list.remove(src)
-        path = [src]
-        path_cost = [0.0]
-        return tabu_list, path, path_cost, src
-
-    def _backoff_again(self, backoff):
-        v = self._rd.random_sample() # a number in [0, 1)
-        xi = self._xi
-        return v < math.exp(-abs(xi*(backoff - 1)))
-
-
-    def _best_of_folder(self, folder):
-        folder.sort(reverse=True) # folder is a list with cost and path as
-                                  # members.
-        return folder[0]
-
-
-    def _store_in_folder(self, folder, path, path_cost):
-        path = deepcopy(path)
-        path_cost = deepcopy(path_cost)
-        total_cost = np.sum(path_cost)
-        size = len(list(set(path)))
-        folder.append([path, path_cost, total_cost, size])
-
-
-    def _build_path(self):
-        tabu_list, path, path_cost, src = self._init_path()
-
-        backoff, folder = 1, []
-        while len(tabu_list):
-            print(path)
-            possibilities = self._graph[src]["to"]
-            cost = self._graph[src]["cost"]
-            probs = self._choice_destiny(src, tabu_list, possibilities, cost)
-            print("out")
-            if np.all(np.isnan(probs)):
-                print(probs)
-                self._store_in_folder(folder, path, path_cost)
-
-                if not self._backoff_again(backoff) or backoff >= len(path):
-                    return self._best_of_folder(folder)
-
-                tabu_list.extend(path[-backoff:])
-                path = path[:-backoff]
-                path_cost = path_cost[:-backoff]
-                src = path[-1]
-                backoff += 1
-                continue
-
-            src = self._rd.choice(possibilities, p=probs)
-            idx = np.where(possibilities == src)
-
-            path_cost.append(float(cost[idx]))
-            path.append(src)
-            tabu_list.remove(src)
-
-        total_cost = sum(path_cost)
-        return path, path_cost, total_cost, len(list(set(path)))
-
-
-    def _visibility(self, d, b):
-        return d ** b
-
-
-    def _choice_destiny(self, src, tabu_list, possibilities, cost):
-        distances = list()
-        prob = np.zeros(possibilities.shape)
+    def _props(self):
         a, b = self._alpha, self._beta
-        i = 0
-        for p, d in zip(possibilities, cost):
-            if p in tabu_list:
-                local_pheromone = self._pheromone[src][i] ** a
-                prob[i] = local_pheromone * self._visibility(d, b)
-            i += 1
-
-        den = np.sum(prob)
-        if den:
-            return prob/den
-        else:
-            return np.nan
+        probs = (self._pheromone ** a) * (self._graph ** b)
+        return probs
 
 
+    def _make_list(self, v):
+        n_nodes = self._graph.shape[0]
+        lst = np.full(shape=n_nodes, fill_value=v)
+        return lst
+
+
+    def _goto(self, *, probs=None, shape=None):
+        if np.any(probs) != None:
+            pos =  self._rd.choice(np.arange(probs.shape[0]), p=probs)
+            return pos
+        elif np.any(shape) != None:
+            return self._rd.choice(np.arange(shape[0]))
+
+        
+    def _update(self, ants, normalize_by):
+        self._decrease_ph()
+
+        for route, L in ants:
+            self._update_ph(route, L/normalize_by)
+
+        if self._elitism:
+            elitist_route = self._best_ant[0]
+            elitist_cost = self._eg * self._best_ant[1]
+            self._update_ph(elitist_route, elitist_cost/normalize_by)
+        
+        
+    def _decrease_ph(self):
+        p = self._decay_rate
+        self._pheromone *= (1-p)
+
+        
+    def _update_ph(self, path, L):
+        from_, to_ = path[:-1], path[1:]
+        q = self._q
+        self._pheromone[from_, to_] += q * L
+
+
+
+        
 def load(filename):
     df = pd.read_csv(filename, sep="\t", header=None)
-    groups = df.groupby(by=0)
-    graph = dict()
-    for key, group in groups:
-        to = group.iloc[:, 1].to_numpy()
-        cost = group.iloc[:, 2].to_numpy()
-        graph[key] = {"to": to, "cost": cost}
+    nodes = np.unique((df.iloc[:, 0], df.iloc[:, 1]))
+    rows = np.max(nodes)
+    distances = np.zeros(shape=(rows, rows))
+    from_= df.iloc[:, 0].to_numpy() - 1
+    to_ = df.iloc[:, 1].to_numpy() - 1
+    dists = df.iloc[:, 2].to_numpy()
+    distances[from_, to_] = dists
 
-    return graph
+    return distances
+
+
+
 
 def main():
     aparse = argparse.ArgumentParser()
@@ -298,7 +222,7 @@ def main():
                         default=[1.0],
                         help="Backoff decay rate.")
 
-    aparse.add_argument("-G", "--reinforcement-gain",
+    aparse.add_argument("-Q", "--reinforcement-gain",
                         nargs=1,
                         type=float,
                         default=[100],
@@ -316,6 +240,7 @@ def main():
                         default=[5.0],
                         help="Gain of eletist ants")
 
+    
     args = aparse.parse_args()
     dataset = args.dataset[0]
     output = args.output[0]
@@ -330,45 +255,80 @@ def main():
     eletism = args.eletism
     eletism_gain = args.eletism_gain[0]
 
-    parameters = f"dataset: {dataset}\n"\
-                 f"output: {output}\n"\
-                 f"ants: {ants}\n"\
-                 f"iterations: {iterations}\n"\
-                 f"initial pheromone: {initial_pheromone}\n"\
-                 f"decay rate: {decay_rate}\n"\
-                 f"alpha: {alpha}\n"\
-                 f"beta: {beta}\n"\
-                 f"xi: {xi}\n"\
-                 f"reinforcement gain: {reinforcement_gain}\n"\
-                 f"eletism: {eletism}\n"\
-                 f"eletism gain: {eletism_gain}"
+    parameters = "PARAMETERS".center(80, " ") + "\n\n"
+    parameters += f"dataset: {dataset}\n"\
+                  f"output: {output}\n"\
+                  f"ants: {ants}\n"\
+                  f"iterations: {iterations}\n"\
+                  f"initial pheromone: {initial_pheromone}\n"\
+                  f"decay rate: {decay_rate}\n"\
+                  f"alpha: {alpha}\n"\
+                  f"beta: {beta}\n"\
+                  f"xi: {xi} (no effect yet)\n"\
+                  f"reinforcement gain: {reinforcement_gain}\n"\
+                  f"eletism: {eletism}\n"\
+                  f"eletism gain: {eletism_gain}"
 
     print(parameters)
+    print("-" * 80)
+    parameters += "\n" + "-" * 80 + "\n"
+    parameters += "PERFORMANCE".center(80, " ") + "\n\n"
     graph = load(dataset)
-    statistics = []
+
+    aco = ACO(graph, ants, iterations, initial_pheromone,
+              decay_rate, alpha, beta, xi, reinforcement_gain, eletism,
+              eletism_gain, seed=0)
+
+    statistics = list()
     for i in range(5):
-        print(f"replication: {i+1}/5")
-        i = int(abs(math.sin(i) * 1000))
-        aco = ACO(graph, output, ants, iterations, initial_pheromone,
-                  decay_rate, alpha, beta, xi, reinforcement_gain, eletism,
-                  eletism_gain, i)
+        print(f"replication {i} started. {' ' * 15}", end="\r")
+        seed = abs(int(13 * i + 11 * i + 7 * i + 5 * i + 3 * i + 2 * i + i + 1))
+        aco.set_seed(seed=seed)
+        start = datetime.now()
+        solution = aco.fit()
+        end = datetime.now()
+        statistics.append(aco._statistics)
+        parameters += f"\nseed {seed}, replication took: {end-start}"
+    print("✔ - replications completed. ")
+        
+    result = statistical_report(np.array(statistics))
+    save_results(output, result)
+    save_parameters(output, parameters)
 
-        pop = aco.fit()
 
-        statistics.append(pop)
+    
 
-    statistics = np.mean(statistics, axis=0)
 
-    df = pd.DataFrame(data=statistics,
-                      columns=["max", "min", "mean", "std", "median"],
-                      dtype=np.float)
+def statistical_report(replications, confidence=0.95):
+    statistics = np.mean(replications, axis=0)
+    rows = statistics.shape[0]
+    stderr = sem(replications, axis=0)
+    n = rows
+    h = stderr * t.ppf((1+confidence)/2, n - 1)
+    statistics = np.append(statistics, h, axis=1)
 
-    df.to_csv(output, index=False, float_format="%.4f")
+    return statistics
 
-    parameters_file = "".join(output.rsplit(".", 1)[:-1]) + "-params.txt"
-    with open(parameters_file, "wt", encoding="utf-8") as f:
+
+
+def save_results(output, result):
+    print("saving results...", end="\r")
+    df = pd.DataFrame(data=result,
+                      columns=["mean", "std", "max", "min", "median",
+                               "stderr (mean)", "stderr (std)", "stderr (max)",
+                               "stderr (mean)", "stderr (median)"])
+    
+    df.to_csv(output, float_format="%.4f", index=False)
+    print("✔ - results saved! :D")
+
+
+def save_parameters(output, parameters):
+    print("saving parameters...", end="\r")
+    base_name = "".join(output.rsplit(".")[:-1])
+    base_name = f"{base_name}_params.txt"
+    with open(base_name, "wt", encoding="utf-8") as f:
         f.write(parameters + "\n")
-
+    print("✔ - parameters saved! xD")
 
 if __name__ == "__main__":
     main()
