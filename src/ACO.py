@@ -314,9 +314,9 @@ def statistical_report(replications, confidence=0.95):
 def save_results(output, result):
     print("saving results...", end="\r")
     df = pd.DataFrame(data=result,
-                      columns=["mean", "std", "max", "min", "median",
-                               "stderr (mean)", "stderr (std)", "stderr (max)",
-                               "stderr (mean)", "stderr (median)"])
+                      columns=["max", "min", "mean", "std", "median",
+                               "stderr (max)", "stderr (min)", "stderr (mean)",
+                               "stderr (std)", "stderr (median)"])
     
     df.to_csv(output, float_format="%.4f", index=False)
     print("✔ - results saved! :D")
