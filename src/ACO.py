@@ -8,7 +8,6 @@ from datetime import datetime
 from scipy.stats import sem, t
 from datetime import datetime
 
-np.set_printoptions(precision=3, threshold=2000, suppress=True, linewidth=200)
 
 
 
@@ -33,7 +32,7 @@ class ACO:
         self._best_ant = None
         self._statistics = None
 
-        
+
     def _save_statistics(self, costs):
         max_v = np.max(costs)
         min_v = np.min(costs)
@@ -48,28 +47,28 @@ class ACO:
     def set_seed(self, seed):
         self._rd = RandomState(seed)
 
-        
+
     def _reset_state(self):
         self._pheromone = np.full(self._graph.shape, self._initial_pheromone)
         self._statistics = list()
 
-        
+
     def fit(self):
         self._reset_state()
-        
+
         for i in range(self._iterations):
             ants, max_cost = self._build_colony(self._ants)
             costs = np.array([ant[1] for ant in ants])
             self._save_statistics(costs)
-            
+
             local_best_ant, best_ant = ants[0], self._best_ant
             if not best_ant or local_best_ant[1] > best_ant[1]:
                 self._best_ant = ants[0]
 
             self._update(ants, normalize_by=max_cost)
         return self._best_ant
-            
-            
+
+
     def _build_colony(self, n):
         ants = list()
         props = self._props()
@@ -84,7 +83,7 @@ class ACO:
 
         ants.sort(key=lambda ant: ant[1], reverse=True)
         return ants, biggest_cost
-            
+
 
     def _build_path(self, probs):
         tabu_list = self._make_list(1)
@@ -99,7 +98,7 @@ class ACO:
             den = np.sum(local_probs)
             if den == 0:
                 break
-            
+
             local_probs /= den
             goto = self._goto(probs=local_probs)
 
@@ -125,12 +124,11 @@ class ACO:
 
     def _goto(self, *, probs=None, shape=None):
         if np.any(probs) != None:
-            pos =  self._rd.choice(np.arange(probs.shape[0]), p=probs)
-            return pos
+            return self._rd.choice(np.arange(probs.shape[0]), p=probs)
         elif np.any(shape) != None:
             return self._rd.choice(np.arange(shape[0]))
 
-        
+
     def _update(self, ants, normalize_by):
         self._decrease_ph()
 
@@ -141,13 +139,13 @@ class ACO:
             elitist_route = self._best_ant[0]
             elitist_cost = self._eg * self._best_ant[1]
             self._update_ph(elitist_route, elitist_cost/normalize_by)
-        
-        
+
+
     def _decrease_ph(self):
         p = self._decay_rate
         self._pheromone *= (1-p)
 
-        
+
     def _update_ph(self, path, L):
         from_, to_ = path[:-1], path[1:]
         q = self._q
@@ -155,7 +153,7 @@ class ACO:
 
 
 
-        
+
 def load(filename):
     df = pd.read_csv(filename, sep="\t", header=None)
     nodes = np.unique((df.iloc[:, 0], df.iloc[:, 1]))
@@ -240,7 +238,6 @@ def main():
                         default=[5.0],
                         help="Gain of elitist ants")
 
-    
     args = aparse.parse_args()
     dataset = args.dataset[0]
     output = args.output[0]
@@ -290,13 +287,12 @@ def main():
         statistics.append(aco._statistics)
         parameters += f"\nseed {seed}, replication took: {end-start}"
     print("✔ - replications completed. ")
-        
+
     result = statistical_report(np.array(statistics))
     save_results(output, result)
     save_parameters(output, parameters)
 
 
-    
 
 
 def statistical_report(replications, confidence=0.95):
@@ -317,9 +313,11 @@ def save_results(output, result):
                       columns=["max", "min", "mean", "std", "median",
                                "stderr (max)", "stderr (min)", "stderr (mean)",
                                "stderr (std)", "stderr (median)"])
-    
+
     df.to_csv(output, float_format="%.4f", index=False)
     print("✔ - results saved! :D")
+
+
 
 
 def save_parameters(output, parameters):
@@ -329,6 +327,10 @@ def save_parameters(output, parameters):
     with open(base_name, "wt", encoding="utf-8") as f:
         f.write(parameters + "\n")
     print("✔ - parameters saved! xD")
+
+
+
+
 
 if __name__ == "__main__":
     main()

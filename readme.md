@@ -32,7 +32,7 @@ em forma de grafos, onde cada cidade é um nó e cada caminho entre
 cidades é um grafo não direcionado. Neste trabalho uma abordagem
 semelhante é adotada, porém diferente da abordagem tradicional do TSP,
 que busca o menor caminho que passe por todas as cidades um única vez,
-neste trabalho é feito o inverso: o maior caminho que percorra todas as
+neste trabalho é feito o inverso: o maior caminho que percorre todas as
 cidades apenas uma vez. O fato de que uma cidade pode ser visitada
 apenas uma vez é uma restrição é específica do problema e não é
 especificado pelo algoritmo em sua forma canônica. Portanto, é
@@ -161,12 +161,12 @@ $$\label{eq:feromonio_up}
   ---------------------- -------------------------------------------------------------
 
 Outro conceito introduzido por @Dorigo1991 foi o conceito de formiga
-eletista, que é representada pela melhor solução encontrada até o
+elitista, que é representada pela melhor solução encontrada até o
 momento. Após atualizar o feromônio de todos os grafos, aqueles que
 contituem a melhor solução até o momento recebem um reforço de
 feromônio. Esse reforço tende guiar a colônia em busca da melhor
 solução. A representação matemática desse conceito está na . Note que o
-ajuste do parâmetro $b$ intensifica ou atenua o efeito do eletismo.
+ajuste do parâmetro $b$ intensifica ou atenua o efeito do elitismo.
 
 $$\label{eq:eletist}
     \Delta\tau_{ij}^k(t) = b\,\cdot\,Q\,\cdot\,L_{best}$$ onde,
@@ -217,7 +217,7 @@ grafo só faz parte da solução se ele for o ponto de partida ou de
 término da solução. Quando há dois nós no grafo com apenas um vizinho,
 há apenas um solução (desconsiderando-se soluções que variam apenas pela
 direção em que são percorridas). Para o caso de três ou mais nós com
-apenas um vizinho, é impossível encontrar uma solução que percorra todos
+apenas um vizinho, é impossível encontrar uma solução que percorre todos
 os nós. Nesse último caso, o *backoff* no seu modelo original, não
 retornaria nenhuma solução, pois ele sempre reiniciaria a formiga em
 outra posição a procura de uma rota que visitasse todos os nós.
@@ -268,12 +268,12 @@ ele é aplicado.
              
   $\tau_0$   O valor inicial do feromônio contido nos grafos. Esse valor deve ser diferente de 0.
              
-  b          É o fator que regula o impacto das formigas eletistas.
+  b          É o fator que regula o impacto das formigas elitistas.
              
   $\xi$      O coeficiente de decaimento. Deve estar no intervalo $[0, +\infty)$. Ajusta a probabilidade do *blackoff* ocorrer.
   ---------- --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-  : Parâmetros de implementação[]{label="tbl:parameters"}
+  : Parâmetros do algoritmo[]{label="tbl:parameters"}
 
 Para executar o algoritmo o comando representado a seguir de ser usado.
 As opções estão especificadas na , onde o parâmetro especificado na
@@ -311,7 +311,7 @@ Os resultados apresentados nessa seção são o resultado a iteração do
 algoritmo diversas vezes e as médias dos parâmetros são retornados. Como
 há 8 parâmetros distintos e 3 datasets, apenas quatro parâmetros são
 analisados: o tamanho da população, a taxa de decaimento do feromônio, o
-coeficiente de decaimento do *backoff* e a presença de eletismo. As
+coeficiente de decaimento do *backoff* e a presença de elitismo. As
 figuras contidas nessa seção apresentam o valor da média (linha
 contínua) e do desvio padrão (linha tracejada) ao longo das iterações.
 
@@ -337,7 +337,7 @@ geraram bons resultados, atingindo uma média próxima a $170$ e desvio
 padrão menor do que $2.5$. Devidos as limitação presentes no *backoff*,
 os demais testes são realizados utilizando o *stochastic backoff*, que
 obteve um desempenho semelhante ao do *backoff* e é capaz de encontrar
-soluções mesmo que não haja um caminho que percorra todos os nós, ou
+soluções mesmo que não haja um caminho que percorre todos os nós, ou
 seja, é mais robusto.
 
 O próximo parâmetro a ser analisado é a taxa de decaimento do feromônio,
@@ -360,9 +360,9 @@ $172.6450$ e $1.0796$, respectivamente. O pior resultado ocorre quando
 $\xi=0.5$, onde a média e o desvio padrão são $167.6450$ e $3.8267$,
 respectivamente. A demonstra esses resultados.
 
-A presença de eletismo é significativa. A população gerada sem eletismo
+A presença de elitismo é significativa. A população gerada sem elitismo
 possui alta variância devido ao fato de não surgir rotas
-probabilisticamente superior as demais. Com a presença do eletismo e,
+probabilisticamente superior as demais. Com a presença do elitismo e,
 por consequência, do reforço de feromônio na melhor rota encontrada até
 o momento, a convergência é mais rápida e a variância se estabilaza mais
 cedo. A demonstra esse efeito.
@@ -381,7 +381,7 @@ $\xi$](dataset_1_xi){width="\textwidth"}
 
 [\[fig:ds1\_xi\]]{#fig:ds1_xi label="fig:ds1_xi"}
 
-![Efeito do eletismo](dataset_1_e){width="\textwidth"}
+![Efeito do elitismo](dataset_1_e){width="\textwidth"}
 
 [\[fig:ds1\_e\]]{#fig:ds1_e label="fig:ds1_e"}
 
@@ -390,7 +390,7 @@ Dataset 2
 
 Este dataset possui uma ordem de grandeza a mais do que o anterior. O
 algoritmo *backoff* não é computacionalmente viável para esse tipo de
-dataset, pois ele parte da premissa de que há um caminho que percorra
+dataset, pois ele parte da premissa de que há um caminho que percorre
 todas os nós uma única vez e ainda que haja, encontrá-lo pode ser muito
 custoso em termos de tempo. Para minimizar esse problema foi introduzio
 o *stochastic backoff*, que recua a solução encontrada
@@ -444,14 +444,14 @@ sem ganho nas demais estatísticas. Para o próximo experimento o valor de
 $\xi$ é mantido fixado em $0.5$.
 
 Por fim, o último parâmetro verificado é a presença ou ausência de
-eletismo. O mecânismo de eletismo no ACO é implementado aplicando um
+elitismo. O mecânismo de elitismo no ACO é implementado aplicando um
 reforço na melhor rota encontrada até a iteração mais recente. O
-eletismo tem impacto na convergência do algoritmo, o que é indicado pela
+elitismo tem impacto na convergência do algoritmo, o que é indicado pela
 variância final das soluções geradas pelo algoritmo. O desvio padrão com
-a presença de eletismo é aproximadamente $3$ vezes maior do que sem.
-Portanto, a presença de eletismo influencia significativa na
+a presença de elitismo é aproximadamente $3$ vezes maior do que sem.
+Portanto, a presença de elitismo influencia significativa na
 convergência do algoritmo sob as configurações desenvolvidas. A
-representa o resultado das colônias com e sem eletismo ao longo de $100$
+representa o resultado das colônias com e sem elitismo ao longo de $100$
 iterações.
 
 [\[fig:dataset\_2\]]{#fig:dataset_2 label="fig:dataset_2"}
@@ -470,7 +470,7 @@ decaimento](dataset_2_xi){width="\textwidth"}
 
 [\[fig:ds2\_xi\]]{#fig:ds2_xi label="fig:ds2_xi"}
 
-![Efeito do eletismo](dataset_2_e){width="\textwidth"}
+![Efeito do elitismo](dataset_2_e){width="\textwidth"}
 
 [\[fig:ds2\_e\]]{#fig:ds2_e label="fig:ds2_e"}
 
@@ -488,9 +488,29 @@ muito elevado e, portanto, não foi possível realizar o *tuning* dos
 parâmetros devido a limitações de tempo. Isso sugere a necessidade de um
 novo design do algoritmo em favor da escalabilidade.
 
+Os resultados da nova implementação do algoritmo ACO foi projetada com
+uso da álgebra linear. A discrepância entre as implementações é
+exorbitante. Enquanto a primeira implementação não foi capaz de
+encontrar soluções em 230H, a nova foi capaz de gerar uma população
+quatro vezes maior (200 formigas) em apenas 40min no mesmo hardware.
+Além do aumento significativo de desempenho, a qualidade da população
+foi significativamente maior. Na as populações com 100 ou mais
+indivíduos foram gerados pela nova implementação e os resultados indicam
+claramente que a quantidade de iterações até alcançar um ponto de
+convergência (um máximo local[^2]) é relativamente rápido.
+
 ![Variação do tamanho da população](dataset_3_pop){width="\textwidth"}
 
 [\[fig:ds3\_pop\]]{#fig:ds3_pop label="fig:ds3_pop"}
+
+![Impacto do coeficiente de
+decaimento](dataset_3_decay){width="\textwidth"}
+
+[\[fig:ds3\_decay\]]{#fig:ds3_decay label="fig:ds3_decay"}
+
+![Impacto da presença de elitismo](dataset_3_pop){width="\textwidth"}
+
+[\[fig:ds3\_elitism\]]{#fig:ds3_elitism label="fig:ds3_elitism"}
 
 Conclusão {#sec:conclusion}
 =========
@@ -504,7 +524,7 @@ níveis. Além disso, os resultados gerados demonstram que o algoritmo
 possui bom convergência, pois independente dos parâmetros utilizandos,
 sempre houve uma melhoria em relação ao estado inicial.
 
-O tamanho da população trás consigo o aumento da variância dos
+O tamanho da população traz consigo o aumento da variância dos
 resultados, porém isso é reduzido com ao longo das iterações. Com
 populações consideralvente grandes a variância volta a diminuir,
 indicando que a variância pode ser modelada em uma função parabólica,
@@ -514,7 +534,7 @@ maiores não são tão siginificativos, embora haja a melhoria. O
 coeficiente de decaimento do *backoff* aumenta a performance do
 algoritmo e o torna mais robusto. O uso de arquivos garante que não há
 perda de boas soluções encontradas durante os *backoffs*. O uso de
-formigas eletistas também se mostrou impactante na convergência da
+formigas elitistas também se mostrou impactante na convergência da
 população pelo reforço de feromônio na melhor rota encontrada até a
 iteração atual. Por fim, o coeficiente de decaimento atinge melhores
 resultados para valores pequenos (menores do que $0.5$), o que sugere
@@ -528,7 +548,7 @@ são estáveis, pois mesmo com o fator aleatório, eles são capazes de
 convergir para soluções próximas das ótimas.
 
 Um problema identificado é a falta de escalabilidade. O algoritmo gastou
-mais de 100 horas (isso depende fortemente do hardware) para processar o
+mais de 200 horas (isso depende fortemente do hardware) para processar o
 dataset 3. A análise do algoritmo indica que o trecho que demanda mais
 tempo é a construção da rota, mais especificamente, a decisão de qual
 vértice tomar. Uma possível solução é transformar o problema para forma
@@ -538,9 +558,22 @@ performance em processadores super-escalares, uma vez que, a presença de
 saltos no algoritmo é reduzido e que permite a execução especulativa de
 instruções.
 
+O novo design resolveu o problema descrito acima, porém a complexidade
+de implementar o backoff utilizando a algebra linear pode reduzir a
+performance do algoritmo novamente. A solução é reformular o *backoff*
+para um modelo baseado em álgebra linear. Portanto, a conclusão sobre o
+*backoff* com base nos resultados obtidos utilizando-se o *backoff*
+($\xi=0$), *stochastic backoff* e a ausência de *backoff*
+($\xi=+\infty$) é que ele não traz ganhos significativos nos testes
+realizados. Os ganhos do uso desse mecânismo deve surgir na aplicação em
+grafos mais complexos, onde a densidade de vértices é menor e há muitos
+nós isolados (1 vizinho, por exemplo).
+
 Para trabalhos futuros há muitas possibilidades. Alguma heurística pode
 ser utilizada para gerar uma solução que agrege, sempre que possível, as
 soluções criadas pelas formigas na iteração atual ou combinar os boas
 soluções anteriores.
 
 [^1]: matheus.candido\@dcc.ufmg.br
+
+[^2]: Possivelmente um máximo global?
