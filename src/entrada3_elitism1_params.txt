@@ -1,0 +1,23 @@
+                                   PARAMETERS                                   
+
+dataset: ../dataset/entrada3.txt
+output: entrada3_elitism1.csv
+ants: 200
+iterations: 80
+initial pheromone: 0.6
+decay rate: 0.5
+alpha: 1.0
+beta: 5.0
+xi: 0.3 (no effect yet)
+reinforcement gain: 5.0
+elitism: True
+elitism gain: 5.0
+--------------------------------------------------------------------------------
+                                  PERFORMANCE                                   
+
+
+seed 1, replication took: 0:40:34.958828
+seed 43, replication took: 0:40:39.435011
+seed 85, replication took: 0:40:24.580072
+seed 127, replication took: 0:40:22.286045
+seed 169, replication took: 0:40:27.309940
