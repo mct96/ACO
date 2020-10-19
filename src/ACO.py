@@ -307,6 +307,7 @@ def statistical_report(replications, confidence=0.95):
 
 
 
+
 def save_results(output, result):
     print("saving results...", end="\r")
     df = pd.DataFrame(data=result,
@@ -327,7 +328,6 @@ def save_parameters(output, parameters):
     with open(base_name, "wt", encoding="utf-8") as f:
         f.write(parameters + "\n")
     print("✔ - parameters saved! xD")
-
 
 
 
