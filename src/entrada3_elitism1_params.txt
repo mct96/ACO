@@ -5,7 +5,7 @@ output: entrada3_elitism1.csv
 ants: 200
 iterations: 80
 initial pheromone: 0.6
-decay rate: 0.5
+decay rate: 0.2
 alpha: 1.0
 beta: 5.0
 xi: 0.3 (no effect yet)
@@ -16,8 +16,8 @@ elitism gain: 5.0
                                   PERFORMANCE                                   
 
 
-seed 1, replication took: 0:40:34.958828
-seed 43, replication took: 0:40:39.435011
-seed 85, replication took: 0:40:24.580072
-seed 127, replication took: 0:40:22.286045
-seed 169, replication took: 0:40:27.309940
+seed 1, replication took: 0:40:38.718127
+seed 43, replication took: 0:40:23.506124
+seed 85, replication took: 0:40:35.346177
+seed 127, replication took: 0:40:33.951406
+seed 169, replication took: 0:40:26.479828
